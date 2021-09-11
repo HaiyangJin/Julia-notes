@@ -1,3 +1,114 @@
+### A Pluto.jl notebook ###
+# v0.16.0
+
+using Markdown
+using InteractiveUtils
+
+# ╔═╡ 96e69c22-12eb-11ec-2939-33d9769219d6
+begin
+	using DataFrames
+	using DataFrameMacros
+	using Arrow
+	using Chain
+	using Random
+	using PlutoUI
+	
+	using StatsModels  # for creating desgin matrix
+	using MixedModels
+	using MixedModelsMakie
+	using CairoMakie
+	using Effects
+	
+	CairoMakie.activate!(type="svg")
+	TableOfContents(title="Contrasts for random effects")
+end
+
+
+# ╔═╡ b06f4012-cc9c-4cd1-9d7c-8de051aa8b42
+md"# Setup"
+
+# ╔═╡ 60f762ec-073b-4e6d-82a0-0a9f2083fdd2
+df = DataFrame(Arrow.Table("data/example_sdif.arrow"))
+
+# ╔═╡ 7c40dc7b-8bc0-4494-8e5c-ff65536d88a8
+# set contrasts
+# contr = Dict(
+# 	:Participant => Grouping(),
+# 	:Condition => SeqDiffCoding(base = "CFS"),
+# 	:Congruency => SeqDiffCoding(base = "incongruent"),
+# 	:Alignment => SeqDiffCoding(base = "misaligned"))
+contr = Dict(
+	:Participant => Grouping(),
+	:Condition => SeqDiffCoding(levels = ["CFS", "monocular"]),
+	:Congruency => SeqDiffCoding(levels = ["incongruent", "congruent"]),
+	:Alignment => SeqDiffCoding(levels = ["misaligned", "aligned"]))
+
+# ╔═╡ 1c8c6e7e-30e8-498f-bab8-5ef08bf14699
+md"# Make the design matrix"
+
+# ╔═╡ 68199b3c-0e14-45e7-81a1-5aa6f4b5430e
+df_con = @chain df begin
+	modelmatrix(@formula(RT ~ Condition * Congruency * Alignment),
+		_; 
+		hints=contr) # make the model matrix
+	DataFrame([ # convert to DataFrame
+			:cond_main, :cong_main, :ali_main,
+			:cond_cong, :cond_ali, :cong_ali,
+			:cond_cong_ali]) 
+	hcat(df, _)
+end
+
+# ╔═╡ 790da9cf-4c57-4823-8f75-41d60d6ccdca
+md"""
+# Fitting the model
+
+## With variables only
+"""
+
+# ╔═╡ 34e20d7d-9c5b-4638-bc85-0badaebfe425
+lmm1 = fit(
+	MixedModel,
+	@formula(RT ~ Condition * Congruency * Alignment + (1 | Participant)),
+	df_con;
+	contrasts = contr)
+
+# ╔═╡ 53855b84-2ff1-44c4-ab4d-2ad01287f11a
+lmm2 = fit(
+	MixedModel,
+	@formula(RT ~ cond_main + cong_main + ali_main +
+		cond_cong + cond_ali + cong_ali + cond_cong_ali + (1 | Participant)),
+	df_con)
+
+# ╔═╡ 00000000-0000-0000-0000-000000000001
+PLUTO_PROJECT_TOML_CONTENTS = """
+[deps]
+Arrow = "69666777-d1a9-59fb-9406-91d4454c9d45"
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+Chain = "8be319e6-bccf-4806-a6f7-6fae938471bc"
+DataFrameMacros = "75880514-38bc-4a95-a458-c2aea5a3a702"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Effects = "8f03c58b-bd97-4933-a826-f71b64d2cca2"
+MixedModels = "ff71e718-51f3-5ec2-a782-8ffcbfa3c316"
+MixedModelsMakie = "b12ae82c-6730-437f-aff9-d2c38332a376"
+PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+StatsModels = "3eaba693-59b7-5ba5-a881-562e759f1c8d"
+
+[compat]
+Arrow = "~1.6.2"
+CairoMakie = "~0.6.5"
+Chain = "~0.4.8"
+DataFrameMacros = "~0.1.0"
+DataFrames = "~1.2.2"
+Effects = "~0.1.2"
+MixedModels = "~4.2.0"
+MixedModelsMakie = "~0.3.8"
+PlutoUI = "~0.7.9"
+StatsModels = "~0.6.25"
+"""
+
+# ╔═╡ 00000000-0000-0000-0000-000000000002
+PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
 [[AbstractFFTs]]
@@ -85,6 +196,18 @@ git-tree-sha1 = "215a9aa4a1f23fbd05b92769fdd62559488d70e9"
 uuid = "fa961155-64e5-5f13-b03f-caf6b980ea82"
 version = "0.4.1"
 
+[[Cairo]]
+deps = ["Cairo_jll", "Colors", "Glib_jll", "Graphics", "Libdl", "Pango_jll"]
+git-tree-sha1 = "d0b3f8b4ad16cb0a2988c6788646a5e6a17b6b1b"
+uuid = "159f3aea-2a34-519c-b102-8c37f9878175"
+version = "1.0.5"
+
+[[CairoMakie]]
+deps = ["Base64", "Cairo", "Colors", "FFTW", "FileIO", "FreeType", "GeometryBasics", "LinearAlgebra", "Makie", "SHA", "StaticArrays"]
+git-tree-sha1 = "8664989955daccc90002629aa80193e44893bb45"
+uuid = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+version = "0.6.5"
+
 [[Cairo_jll]]
 deps = ["Artifacts", "Bzip2_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "JLLWrappers", "LZO_jll", "Libdl", "Pixman_jll", "Pkg", "Xorg_libXext_jll", "Xorg_libXrender_jll", "Zlib_jll", "libpng_jll"]
 git-tree-sha1 = "f2202b55d816427cd385a9a4f3ffb226bee80f99"
@@ -165,12 +288,6 @@ version = "3.35.0"
 [[CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
-
-[[Configurations]]
-deps = ["ExproniconLite", "OrderedCollections", "TOML"]
-git-tree-sha1 = "41d153a50b001a7c534f19e263540cca1a4e7cf3"
-uuid = "5218b696-f38b-4ac9-8b61-a12ec717816d"
-version = "0.16.4"
 
 [[Contour]]
 deps = ["StaticArrays"]
@@ -268,11 +385,6 @@ git-tree-sha1 = "b7e3d17636b348f005f11040025ae8c6f645fe92"
 uuid = "e2ba6199-217a-4e67-a87a-7c52f15ade04"
 version = "0.1.6"
 
-[[ExproniconLite]]
-git-tree-sha1 = "c97ce5069033ac15093dc44222e3ecb0d3af8966"
-uuid = "55351af7-c7e9-48d6-89ff-24e801d99491"
-version = "0.6.9"
-
 [[FFMPEG]]
 deps = ["FFMPEG_jll"]
 git-tree-sha1 = "b57e3acbe22f8484b4b5ff66a7499717fe1a9cc8"
@@ -302,9 +414,6 @@ deps = ["Pkg", "Requires", "UUIDs"]
 git-tree-sha1 = "3c041d2ac0a52a12a27af2782b34900d9c3ee68c"
 uuid = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 version = "1.11.1"
-
-[[FileWatching]]
-uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 
 [[FillArrays]]
 deps = ["LinearAlgebra", "Random", "SparseArrays", "Statistics"]
@@ -358,12 +467,6 @@ version = "1.0.10+0"
 deps = ["Random"]
 uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
 
-[[FuzzyCompletions]]
-deps = ["REPL"]
-git-tree-sha1 = "2cc2791b324e8ed387a91d7226d17be754e9de61"
-uuid = "fb4132e2-a121-4a70-b8a1-d5b831dcdcc2"
-version = "0.4.3"
-
 [[GLM]]
 deps = ["Distributions", "LinearAlgebra", "Printf", "Reexport", "SparseArrays", "SpecialFunctions", "Statistics", "StatsBase", "StatsFuns", "StatsModels"]
 git-tree-sha1 = "f564ce4af5e79bb88ff1f4488e64363487674278"
@@ -411,12 +514,6 @@ git-tree-sha1 = "53bb909d1151e57e2484c3d1b53e19552b887fb2"
 uuid = "42e2da0e-8278-4e71-bc24-59509adca0fe"
 version = "1.0.2"
 
-[[HTTP]]
-deps = ["Base64", "Dates", "IniFile", "Logging", "MbedTLS", "NetworkOptions", "Sockets", "URIs"]
-git-tree-sha1 = "60ed5f1643927479f845b0135bb369b031b541fa"
-uuid = "cd3eb016-35fb-5094-929b-558a96fad6f3"
-version = "0.9.14"
-
 [[HarfBuzz_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "Graphite2_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Pkg"]
 git-tree-sha1 = "8a954fed8ac097d5be04921d595f741115c1b2ad"
@@ -455,12 +552,6 @@ version = "1.0.0"
 git-tree-sha1 = "f5fc07d4e706b84f72d54eedcc1c13d92fb0871c"
 uuid = "d25df0c9-e2be-5dd7-82c8-3ad0b3e990b9"
 version = "0.1.2"
-
-[[IniFile]]
-deps = ["Test"]
-git-tree-sha1 = "098e4d2c533924c921f9f9847274f2ad89e018b8"
-uuid = "83e8ac13-25f8-5344-8a64-a9f2b223428f"
-version = "0.5.0"
 
 [[IntelOpenMP_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -679,12 +770,6 @@ git-tree-sha1 = "f5c8789464aed7058107463e5cef53e6ad3f1f3e"
 uuid = "0a4f8689-d25c-4efe-a92b-7142dfc1aa53"
 version = "0.2.0"
 
-[[MbedTLS]]
-deps = ["Dates", "MbedTLS_jll", "Random", "Sockets"]
-git-tree-sha1 = "1c38e51c3d08ef2278062ebceade0e46cefc96fe"
-uuid = "739be429-bea8-5141-9913-cc70e7f3736d"
-version = "1.0.3"
-
 [[MbedTLS_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
@@ -724,12 +809,6 @@ version = "0.3.3"
 
 [[MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
-
-[[MsgPack]]
-deps = ["Serialization"]
-git-tree-sha1 = "a8cbf066b54d793b9a48c5daa5d586cf2b5bd43d"
-uuid = "99f44e22-a591-53d1-9472-aa23ef4bd671"
-version = "1.1.0"
 
 [[MutableArithmetics]]
 deps = ["LinearAlgebra", "SparseArrays", "Test"]
@@ -845,6 +924,12 @@ git-tree-sha1 = "646eed6f6a5d8df6708f15ea7e02a7a2c4fe4800"
 uuid = "5432bcbf-9aad-5242-b902-cca2824c8663"
 version = "0.5.10"
 
+[[Pango_jll]]
+deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "FriBidi_jll", "Glib_jll", "HarfBuzz_jll", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "9bc1871464b12ed19297fbc56c4fb4ba84988b0d"
+uuid = "36c8627f-9965-5494-a995-c6b170f724f3"
+version = "1.47.0+0"
+
 [[Parsers]]
 deps = ["Dates"]
 git-tree-sha1 = "438d35d2d95ae2c5e8780b330592b6de8494e779"
@@ -873,11 +958,11 @@ git-tree-sha1 = "9ff1c70190c1c30aebca35dc489f7411b256cd23"
 uuid = "995b91a9-d308-5afd-9ec6-746e21dbc043"
 version = "1.0.13"
 
-[[Pluto]]
-deps = ["Base64", "Configurations", "Dates", "Distributed", "FileWatching", "FuzzyCompletions", "HTTP", "InteractiveUtils", "Logging", "Markdown", "MsgPack", "Pkg", "REPL", "Sockets", "TableIOInterface", "Tables", "UUIDs"]
-git-tree-sha1 = "648169dbd7ba3e26b52f6cc432c2ba68393e6fef"
-uuid = "c3e4b0f8-55cb-11ea-2926-15256bba5781"
-version = "0.16.0"
+[[PlutoUI]]
+deps = ["Base64", "Dates", "InteractiveUtils", "JSON", "Logging", "Markdown", "Random", "Reexport", "Suppressor"]
+git-tree-sha1 = "44e225d5837e2a2345e69a1d1e01ac2443ff9fcb"
+uuid = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+version = "0.7.9"
 
 [[PolygonOps]]
 git-tree-sha1 = "c031d2332c9a8e1c90eca239385815dc271abb22"
@@ -1096,14 +1181,14 @@ version = "1.7.3"
 deps = ["Libdl", "LinearAlgebra", "Serialization", "SparseArrays"]
 uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 
+[[Suppressor]]
+git-tree-sha1 = "a819d77f31f83e5792a76081eee1ea6342ab8787"
+uuid = "fd094767-a336-5f1f-9728-57cf17d0bbfb"
+version = "0.2.0"
+
 [[TOML]]
 deps = ["Dates"]
 uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
-
-[[TableIOInterface]]
-git-tree-sha1 = "9a0d3ab8afd14f33a35af7391491ff3104401a35"
-uuid = "d1efa939-5518-4425-949f-ab857e148477"
-version = "0.1.6"
 
 [[TableTraits]]
 deps = ["IteratorInterfaceExtensions"]
@@ -1148,11 +1233,6 @@ deps = ["Random", "Test"]
 git-tree-sha1 = "216b95ea110b5972db65aa90f88d8d89dcb8851c"
 uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
 version = "0.9.6"
-
-[[URIs]]
-git-tree-sha1 = "97bbe755a53fe859669cd907f2d96aee8d2c1355"
-uuid = "5c2747f8-b7ea-4ff2-ba2e-563bfd36b1d4"
-version = "1.3.0"
 
 [[UUIDs]]
 deps = ["Random", "SHA"]
@@ -1292,3 +1372,17 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "ee567a171cce03570d77ad3a43e90218e38937a9"
 uuid = "dfaa095f-4041-5dcd-9319-2fabd8486b76"
 version = "3.5.0+0"
+"""
+
+# ╔═╡ Cell order:
+# ╠═96e69c22-12eb-11ec-2939-33d9769219d6
+# ╟─b06f4012-cc9c-4cd1-9d7c-8de051aa8b42
+# ╠═60f762ec-073b-4e6d-82a0-0a9f2083fdd2
+# ╠═7c40dc7b-8bc0-4494-8e5c-ff65536d88a8
+# ╟─1c8c6e7e-30e8-498f-bab8-5ef08bf14699
+# ╠═68199b3c-0e14-45e7-81a1-5aa6f4b5430e
+# ╟─790da9cf-4c57-4823-8f75-41d60d6ccdca
+# ╠═34e20d7d-9c5b-4638-bc85-0badaebfe425
+# ╠═53855b84-2ff1-44c4-ab4d-2ad01287f11a
+# ╟─00000000-0000-0000-0000-000000000001
+# ╟─00000000-0000-0000-0000-000000000002
